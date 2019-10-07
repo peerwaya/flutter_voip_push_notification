@@ -15,27 +15,56 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    registerVoipNotification();
+    configure();
   }
 
   // Configures a voip push notification
-  Future<void> registerVoipNotification() async {
+  Future<void> configure() async {
+    // request permission (required)
+    await FlutterVoipPushNotification().requestNotificationPermissions();
+
     // listen to voip device token changes
-    FlutterVoipPushNotification().onTokenRefresh.listen((String token) {
-      setState(() {
-        _pushToken = token;
-      });
+    FlutterVoipPushNotification().onTokenRefresh.listen(onToken);
+
+    // do configure voip push
+    FlutterVoipPushNotification()
+        .configure(onMessage: onMessage, onResume: onResume);
+  }
+
+  /// Called when the device token changes
+  void onToken(String token) {
+    // send token to your apn provider server
+    setState(() {
+      _pushToken = token;
     });
-    FlutterVoipPushNotification().configure(
-        onMessage: (Map<String, dynamic> payload) {
-      // handle foreground notification
-      print("received on foreground payload: $payload");
-      return null;
-    }, onResume: (Map<String, dynamic> payload) {
-      print("received on background payload: $payload");
-      // handle background notification
-      return null;
-    });
+  }
+
+  /// Called to receive notification when app is in foreground
+  ///
+  /// [isLocal] is true if its a local notification or false otherwise (remote notification)
+  /// [payload] the notification payload to be processed. use this to present a local notification
+  Future<dynamic> onMessage(bool isLocal, Map<String, dynamic> payload) {
+    // handle foreground notification
+    print("received on foreground payload: $payload, isLocal=$isLocal");
+    return null;
+  }
+
+  /// Called to receive notification when app is resuming from background
+  ///
+  /// [isLocal] is true if its a local notification or false otherwise (remote notification)
+  /// [payload] the notification payload to be processed. use this to present a local notification
+  Future<dynamic> onResume(bool isLocal, Map<String, dynamic> payload) {
+    // handle background notification
+    print("received on background payload: $payload, isLocal=$isLocal");
+    showLocalNotification(payload);
+    return null;
+  }
+
+  showLocalNotification(Map<String, dynamic> notification) {
+    String alert = notification["aps"]["alert"];
+    FlutterVoipPushNotification().presentLocalNotification(LocalNotification(
+      alertBody: "Hello $alert",
+    ));
   }
 
   @override

@@ -1,10 +1,19 @@
 #import "FlutterVoipPushNotificationPlugin.h"
-#import <flutter_voip_push_notification/flutter_voip_push_notification-Swift.h>
+
+NSString *const FlutterVoipRemoteNotificationsRegistered = @"voipRemoteNotificationsRegistered";
+NSString *const FlutterVoipLocalNotificationReceived = @"voipLocalNotificationReceived";
+NSString *const FlutterVoipRemoteNotificationReceived = @"voipRemoteNotificationReceived";
+
+BOOL RunningInAppExtension(void)
+{
+    return [[[[NSBundle mainBundle] bundlePath] pathExtension] isEqualToString:@"appex"];
+}
 
 @implementation FlutterVoipPushNotificationPlugin {
     FlutterMethodChannel* _channel;
     BOOL _resumingFromBackground;
 }
+
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
     FlutterVoipPushNotificationPlugin* instance = [[FlutterVoipPushNotificationPlugin alloc] initWithRegistrar:registrar
                                                                        messenger:[registrar messenger]];
@@ -21,16 +30,48 @@
                     methodChannelWithName:@"com.peerwaya/flutter_voip_push_notification"
                     binaryMessenger:[registrar messenger]];
         [registrar addMethodCallDelegate:self channel:_channel];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(handleRemoteNotificationsRegistered:)
+                                                     name:FlutterVoipRemoteNotificationsRegistered
+                                                   object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(handleLocalNotificationReceived:)
+                                                     name:FlutterVoipLocalNotificationReceived
+                                                   object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(handleRemoteNotificationReceived:)
+                                                     name:FlutterVoipRemoteNotificationReceived
+                                                   object:nil];
     }
     return self;
 }
 
+- (void)dealloc
+{
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
     NSString *method = call.method;
-    if ([@"configure" isEqualToString:method]) {
+    if ([@"requestNotificationPermissions" isEqualToString:method]) {
+        if (RunningInAppExtension()) {
+            result(nil);
+            return;
+        }
         [self registerUserNotification:call.arguments result:result];
+    }if ([@"checkPermissions" isEqualToString:method]) {
+        if (RunningInAppExtension()) {
+            result(@{@"alert": @NO, @"badge": @NO, @"sound": @NO});
+            return;
+        }
+        result([self checkPermissions]);
+    }if ([@"configure" isEqualToString:method]) {
+        [self voipRegistration];
         result(nil);
-    } else {
+    }if ([@"presentLocalNotification" isEqualToString:method]) {
+        [self presentLocalNotification:call.arguments];
+        result(nil);
+    }else {
         result(FlutterMethodNotImplemented);
     }
 }
@@ -50,8 +91,17 @@
     UIUserNotificationSettings *settings =
     [UIUserNotificationSettings settingsForTypes:notificationTypes categories:nil];
     [[UIApplication sharedApplication] registerUserNotificationSettings:settings];
-    [self voipRegistration];
     result(nil);
+}
+
+- (NSDictionary *)checkPermissions
+{
+    NSUInteger types = [[UIApplication sharedApplication] currentUserNotificationSettings].types;
+    return @{
+             @"alert": @((types & UIUserNotificationTypeAlert) > 0),
+             @"badge": @((types & UIUserNotificationTypeBadge) > 0),
+             @"sound": @((types & UIUserNotificationTypeSound) > 0),
+             };
 }
 
 - (void)voipRegistration
@@ -61,34 +111,68 @@
     // Create a push registry object
     PKPushRegistry * voipRegistry = [[PKPushRegistry alloc] initWithQueue: mainQueue];
     // Set the registry's delegate to self
-    voipRegistry.delegate = self;
+    voipRegistry.delegate = (FlutterVoipPushNotificationPlugin *)[UIApplication sharedApplication].delegate;
     // Set the push type to VoIP
     voipRegistry.desiredPushTypes = [NSSet setWithObject:PKPushTypeVoIP];
 }
-                               
+
+- (void)presentLocalNotification:(UILocalNotification *)notification
+{
+    [[UIApplication sharedApplication] presentLocalNotificationNow:notification];
+}
+
 #pragma mark - PKPushRegistryDelegate methods
-                               
-// Handle updated push credentials
-- (void)pushRegistry:(PKPushRegistry *)registry didUpdatePushCredentials: (PKPushCredentials *)credentials forType:(NSString *)type {
-   // Register VoIP push token (a property of PKPushCredentials) with server
+
++ (void)didUpdatePushCredentials:(PKPushCredentials *)credentials forType:(NSString *)type
+{
     NSLog(@"[FlutterVoipPushNotificationPlugin] didUpdatePushCredentials credentials.token = %@, type = %@", credentials.token, type);
+    
     NSMutableString *hexString = [NSMutableString string];
     NSUInteger voipTokenLength = credentials.token.length;
     const unsigned char *bytes = credentials.token.bytes;
     for (NSUInteger i = 0; i < voipTokenLength; i++) {
         [hexString appendFormat:@"%02x", bytes[i]];
     }
-    [_channel invokeMethod:@"onToken" arguments:[hexString copy]];
+    [[NSNotificationCenter defaultCenter] postNotificationName:FlutterVoipRemoteNotificationsRegistered
+                                                        object:self
+                                                      userInfo:@{@"deviceToken" : [hexString copy]}];
 }
-                               
-// Handle incoming pushes
-- (void)pushRegistry:(PKPushRegistry *)registry didReceiveIncomingPushWithPayload:(PKPushPayload *)payload forType:(NSString *)type {
-   // Process the received push
+
++ (void)didReceiveIncomingPushWithPayload:(PKPushPayload *)payload forType:(NSString *)type
+{
     NSLog(@"[FlutterVoipPushNotificationPlugin] didReceiveIncomingPushWithPayload payload.dictionaryPayload = %@, type = %@", payload.dictionaryPayload, type);
+    [[NSNotificationCenter defaultCenter] postNotificationName:FlutterVoipRemoteNotificationReceived
+                                                        object:self
+                                                      userInfo:payload.dictionaryPayload];
+}
+
+- (void)handleRemoteNotificationsRegistered:(NSNotification *)notification
+{
+    NSLog(@"[FlutterVoipPushNotificationPlugin] handleRemoteNotificationsRegistered notification.userInfo = %@", notification.userInfo);
+    [_channel invokeMethod:@"onToken" arguments:notification.userInfo];
+}
+
+- (void)handleLocalNotificationReceived:(NSNotification *)notification
+{
+#ifdef DEBUG
+    NSLog(@"[FlutterVoipPushNotificationPlugin] handleLocalNotificationReceived notification.userInfo = %@",notification.userInfo);
+#endif
     if (_resumingFromBackground) {
-        [_channel invokeMethod:@"onResume" arguments:payload.dictionaryPayload];
+        [_channel invokeMethod:@"onResume" arguments:@{@"local": @YES, @"notification": notification.userInfo}];
     } else {
-        [_channel invokeMethod:@"onMessage" arguments:payload.dictionaryPayload];
+        [_channel invokeMethod:@"onMessage" arguments:@{@"local": @YES, @"notification": notification.userInfo}];
+    }
+}
+
+- (void)handleRemoteNotificationReceived:(NSNotification *)notification
+{
+#ifdef DEBUG
+    NSLog(@"[FlutterVoipPushNotificationPlugin] handleRemoteNotificationReceived notification.userInfo = %@", notification.userInfo);
+#endif
+    if (_resumingFromBackground) {
+        [_channel invokeMethod:@"onResume" arguments:@{@"local": @NO, @"notification": notification.userInfo}];
+    } else {
+        [_channel invokeMethod:@"onMessage" arguments:@{@"local": @NO, @"notification": notification.userInfo}];
     }
 }
 

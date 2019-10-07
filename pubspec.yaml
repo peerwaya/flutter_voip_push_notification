@@ -1,6 +1,6 @@
 name: flutter_voip_push_notification
 description: Flutter VoIP Push Notification - Currently iOS >= 8.0 only
-version: 0.0.1
+version: 0.0.2
 author: Onyemaechi Okafor <peerwaya@yahoo.com>
 homepage: https://github.com/peerwaya/flutter_voip_push_notification
 
