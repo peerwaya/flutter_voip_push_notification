@@ -11,7 +11,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   String _pushToken = '';
-
+  FlutterVoipPushNotification _voipPush = FlutterVoipPushNotification();
   @override
   void initState() {
     super.initState();
@@ -21,14 +21,13 @@ class _MyAppState extends State<MyApp> {
   // Configures a voip push notification
   Future<void> configure() async {
     // request permission (required)
-    await FlutterVoipPushNotification().requestNotificationPermissions();
+    await _voipPush.requestNotificationPermissions();
 
     // listen to voip device token changes
-    FlutterVoipPushNotification().onTokenRefresh.listen(onToken);
+    _voipPush.onTokenRefresh.listen(onToken);
 
     // do configure voip push
-    FlutterVoipPushNotification()
-        .configure(onMessage: onMessage, onResume: onResume);
+    _voipPush.configure(onMessage: onMessage, onResume: onResume);
   }
 
   /// Called when the device token changes
@@ -62,7 +61,7 @@ class _MyAppState extends State<MyApp> {
 
   showLocalNotification(Map<String, dynamic> notification) {
     String alert = notification["aps"]["alert"];
-    FlutterVoipPushNotification().presentLocalNotification(LocalNotification(
+    _voipPush.presentLocalNotification(LocalNotification(
       alertBody: "Hello $alert",
     ));
   }

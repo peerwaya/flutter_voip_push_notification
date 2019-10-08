@@ -12,14 +12,14 @@ import 'package:flutter/widgets.dart';
 typedef Future<dynamic> MessageHandler(
     bool isLocal, Map<String, dynamic> notification);
 
-class IosNotificationSettings {
-  const IosNotificationSettings({
+class NotificationSettings {
+  const NotificationSettings({
     this.sound = true,
     this.alert = true,
     this.badge = true,
   });
 
-  IosNotificationSettings._fromMap(Map<String, bool> settings)
+  NotificationSettings._fromMap(Map<String, bool> settings)
       : sound = settings['sound'],
         alert = settings['alert'],
         badge = settings['badge'];
@@ -132,8 +132,8 @@ class FlutterVoipPushNotification {
   /// Prompts the user for notification permissions the first time
   /// it is called.
   Future<void> requestNotificationPermissions(
-      [IosNotificationSettings iosSettings =
-          const IosNotificationSettings()]) async {
+      [NotificationSettings iosSettings =
+          const NotificationSettings()]) async {
     _channel.invokeMethod<void>(
         'requestNotificationPermissions', iosSettings.toMap());
   }
