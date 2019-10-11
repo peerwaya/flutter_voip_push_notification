@@ -15,8 +15,7 @@ BOOL RunningInAppExtension(void)
 }
 
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
-    FlutterVoipPushNotificationPlugin* instance = [[FlutterVoipPushNotificationPlugin alloc] initWithRegistrar:registrar
-                                                                       messenger:[registrar messenger]];
+    FlutterVoipPushNotificationPlugin* instance = [[FlutterVoipPushNotificationPlugin alloc] initWithRegistrar:registrar messenger:[registrar messenger]];
     [registrar addApplicationDelegate:instance];
 }
 
@@ -65,9 +64,6 @@ BOOL RunningInAppExtension(void)
             return;
         }
         result([self checkPermissions]);
-    }if ([@"configure" isEqualToString:method]) {
-        [self voipRegistration];
-        result(nil);
     }if ([@"presentLocalNotification" isEqualToString:method]) {
         [self presentLocalNotification:call.arguments];
         result(nil);
@@ -119,6 +115,14 @@ BOOL RunningInAppExtension(void)
 - (void)presentLocalNotification:(UILocalNotification *)notification
 {
     [[UIApplication sharedApplication] presentLocalNotificationNow:notification];
+}
+
+#pragma mark - AppDelegate
+
+- (BOOL)application:(UIApplication *)application
+    didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+  [self voipRegistration];
+  return YES;
 }
 
 #pragma mark - PKPushRegistryDelegate methods
