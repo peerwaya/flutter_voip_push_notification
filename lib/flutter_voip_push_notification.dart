@@ -89,9 +89,10 @@ class FlutterVoipPushNotification {
           const MethodChannel('com.peerwaya/flutter_voip_push_notification'));
 
   final MethodChannel _channel;
-
+  String _token;
   MessageHandler _onMessage;
   MessageHandler _onResume;
+
 
   final StreamController<String> _tokenStreamController =
       StreamController<String>.broadcast();
@@ -116,7 +117,8 @@ class FlutterVoipPushNotification {
     final Map map = call.arguments.cast<String, dynamic>();
     switch (call.method) {
       case "onToken":
-        _tokenStreamController.add(map["deviceToken"]);
+        _token = map["deviceToken"];
+        _tokenStreamController.add(_token);
         return null;
       case "onMessage":
         return _onMessage(
@@ -127,6 +129,11 @@ class FlutterVoipPushNotification {
       default:
         throw UnsupportedError("Unrecognized JSON message");
     }
+  }
+
+  /// Returns the locally cached push token
+  Future<String> getToken() async {
+    return await _channel.invokeMethod<String>('getToken');
   }
 
   /// Prompts the user for notification permissions the first time
