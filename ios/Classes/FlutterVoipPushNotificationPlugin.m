@@ -12,6 +12,7 @@ BOOL RunningInAppExtension(void)
 @implementation FlutterVoipPushNotificationPlugin {
     FlutterMethodChannel* _channel;
     BOOL _resumingFromBackground;
+    PKPushRegistry * _voipRegistry;
 }
 
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
@@ -67,6 +68,8 @@ BOOL RunningInAppExtension(void)
     }if ([@"presentLocalNotification" isEqualToString:method]) {
         [self presentLocalNotification:call.arguments];
         result(nil);
+    }if ([@"getToken" isEqualToString:method]) {
+        result([self getToken]);
     }else {
         result(FlutterMethodNotImplemented);
     }
@@ -105,11 +108,11 @@ BOOL RunningInAppExtension(void)
     NSLog(@"[FlutterVoipPushNotificationPlugin] voipRegistration");
     dispatch_queue_t mainQueue = dispatch_get_main_queue();
     // Create a push registry object
-    PKPushRegistry * voipRegistry = [[PKPushRegistry alloc] initWithQueue: mainQueue];
+    _voipRegistry = [[PKPushRegistry alloc] initWithQueue: mainQueue];
     // Set the registry's delegate to self
-    voipRegistry.delegate = (FlutterVoipPushNotificationPlugin *)[UIApplication sharedApplication].delegate;
+    _voipRegistry.delegate = (FlutterVoipPushNotificationPlugin *)[UIApplication sharedApplication].delegate;
     // Set the push type to VoIP
-    voipRegistry.desiredPushTypes = [NSSet setWithObject:PKPushTypeVoIP];
+    _voipRegistry.desiredPushTypes = [NSSet setWithObject:PKPushTypeVoIP];
 }
 
 - (void)presentLocalNotification:(UILocalNotification *)notification
@@ -123,6 +126,27 @@ BOOL RunningInAppExtension(void)
     didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
   [self voipRegistration];
   return YES;
+}
+
+- (void)applicationDidEnterBackground:(UIApplication *)application {
+  _resumingFromBackground = YES;
+}
+
+- (void)applicationDidBecomeActive:(UIApplication *)application {
+  _resumingFromBackground = NO;
+}
+
+
+- (NSString*)getToken
+{
+    NSMutableString *hexString = [NSMutableString string];
+    NSData* token = [_voipRegistry pushTokenForType:PKPushTypeVoIP];
+    NSUInteger voipTokenLength = token.length;
+    const unsigned char *bytes = token.bytes;
+    for (NSUInteger i = 0; i < voipTokenLength; i++) {
+        [hexString appendFormat:@"%02x", bytes[i]];
+    }
+    return hexString;
 }
 
 #pragma mark - PKPushRegistryDelegate methods
@@ -140,6 +164,7 @@ BOOL RunningInAppExtension(void)
     [[NSNotificationCenter defaultCenter] postNotificationName:FlutterVoipRemoteNotificationsRegistered
                                                         object:self
                                                       userInfo:@{@"deviceToken" : [hexString copy]}];
+   
 }
 
 + (void)didReceiveIncomingPushWithPayload:(PKPushPayload *)payload forType:(NSString *)type
