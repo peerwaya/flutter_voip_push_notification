@@ -27,7 +27,11 @@ class _MyAppState extends State<MyApp> {
     _voipPush.onTokenRefresh.listen(onToken);
 
     // do configure voip push
-    _voipPush.configure(onMessage: onMessage, onResume: onResume);
+    _voipPush.configure(
+      onMessage: onMessage,
+      onResume: onResume,
+      onInvalidToken: onInvalidToken,
+    );
   }
 
   /// Called when the device token changes
@@ -59,9 +63,20 @@ class _MyAppState extends State<MyApp> {
     return null;
   }
 
-  showLocalNotification(Map<String, dynamic> notification) {
+  /// Call to receive an PushKit invalid token
+  ///
+  /// [invalidToken] is the token that is no longer valid
+  /// Check out why a token could no longer be valid
+  /// https://stackoverflow.com/questions/46977380/voip-push-under-what-circumstances-does-didinvalidatepushtokenfortype-get-calle#47015401
+  Future<dynamic> onInvalidToken(String invalidToken) {
+    // Tell the server to remove the invalid token
+    print("received on background invalidToken: $invalidToken");
+    return null;
+  }
+
+  Future<void> showLocalNotification(Map<String, dynamic> notification) {
     String alert = notification["aps"]["alert"];
-    _voipPush.presentLocalNotification(LocalNotification(
+    return _voipPush.presentLocalNotification(LocalNotification(
       alertBody: "Hello $alert",
     ));
   }

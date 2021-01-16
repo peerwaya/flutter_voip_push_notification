@@ -1,4 +1,5 @@
 # Flutter VoIP Push Notification
+
 [![pub package](https://img.shields.io/pub/v/flutter_voip_push_notification.svg)](https://pub.dartlang.org/packages/flutter_voip_push_notification)
 Flutter VoIP Push Notification - Currently iOS >= 8.0 only
 
@@ -22,9 +23,7 @@ Please refer to [VoIP Best Practices][2].
 
 **Note**: Do NOT follow the `Configure VoIP Push Notification` part from the above link, use the instruction below instead.
 
-
 #### AppDelegate.swift
-
 
 ```swift
 
@@ -50,6 +49,11 @@ import flutter_voip_push_notification      /* <------ add this line */
         FlutterVoipPushNotificationPlugin.didReceiveIncomingPush(with: payload, forType: type.rawValue)
     }
 
+    // Handle invalidated push tokens
+    func pushRegistry(_ registry: PKPushRegistry, didInvalidatePushTokenFor type: PKPushType) {
+        FlutterVoipPushNotificationPlugin.didInvalidatePushToken(forType: type.rawValue)
+    }
+
     // Handle incoming pushes
     func pushRegistry(_ registry: PKPushRegistry, didUpdate pushCredentials: PKPushCredentials, for type: PKPushType) {
         // Process the received push
@@ -61,7 +65,6 @@ import flutter_voip_push_notification      /* <------ add this line */
 ```
 
 #### AppDelegate.m Modification
-
 
 ```objective-c
 
@@ -87,6 +90,12 @@ import flutter_voip_push_notification      /* <------ add this line */
   [FlutterVoipPushNotificationPlugin didUpdatePushCredentials:credentials forType:(NSString *)type];
 }
 
+// The system calls this method when a previously provided push token is no longer valid for use. No action is necessary on your part to reregister the push type. Instead, use this method to notify your server not to send push notifications using the matching push token.
+- (void)pushRegistry:(PKPushRegistry *)registry didInvalidatePushTokenForType:(PKPushType)type
+{
+  [FlutterVoipPushNotificationPlugin didInvalidatePushTokenForType:(NSString *)type];
+}
+
 // Handle incoming pushes
 - (void)pushRegistry:(PKPushRegistry *)registry didReceiveIncomingPushWithPayload:(PKPushPayload *)payload forType:(NSString *)type {
   // Process the received push
@@ -100,14 +109,13 @@ import flutter_voip_push_notification      /* <------ add this line */
 ```
 
 ## Usage
+
 Add `flutter_voip_push_notification` as a [dependency in your pubspec.yaml file](https://flutter.io/using-packages/).
 
 ### Example
 
-
 ```dart
 
-import 'package:flutter/material.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter_voip_push_notification/flutter_voip_push_notification.dart';
@@ -137,7 +145,11 @@ class _MyAppState extends State<MyApp> {
     _voipPush.onTokenRefresh.listen(onToken);
 
     // do configure voip push
-    _voipPush.configure(onMessage: onMessage, onResume: onResume);
+    _voipPush.configure(
+      onMessage: onMessage,
+      onResume: onResume,
+      onInvalidToken: onInvalidToken,
+    );
   }
 
   /// Called when the device token changes
@@ -169,9 +181,20 @@ class _MyAppState extends State<MyApp> {
     return null;
   }
 
-  showLocalNotification(Map<String, dynamic> notification) {
+  /// Call to receive an PushKit invalid token
+  ///
+  /// [invalidToken] is the token that is no longer valid
+  /// Check out why a token could no longer be valid
+  /// https://stackoverflow.com/questions/46977380/voip-push-under-what-circumstances-does-didinvalidatepushtokenfortype-get-calle#47015401
+  Future<dynamic> onInvalidToken(String invalidToken) {
+    // Tell the server to remove the invalid token
+    print("received on background invalidToken: $invalidToken");
+    return null;
+  }
+
+  Future<void> showLocalNotification(Map<String, dynamic> notification) {
     String alert = notification["aps"]["alert"];
-    _voipPush.presentLocalNotification(LocalNotification(
+    return _voipPush.presentLocalNotification(LocalNotification(
       alertBody: "Hello $alert",
     ));
   }

@@ -1,6 +1,7 @@
 #import "FlutterVoipPushNotificationPlugin.h"
 
 NSString *const FlutterVoipRemoteNotificationsRegistered = @"voipRemoteNotificationsRegistered";
+NSString *const FlutterVoipPushTokenInvalidated = @"voipPushTokenInvalidated";
 NSString *const FlutterVoipLocalNotificationReceived = @"voipLocalNotificationReceived";
 NSString *const FlutterVoipRemoteNotificationReceived = @"voipRemoteNotificationReceived";
 
@@ -41,6 +42,10 @@ BOOL RunningInAppExtension(void)
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(handleRemoteNotificationReceived:)
                                                      name:FlutterVoipRemoteNotificationReceived
+                                                   object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(handlePushTokenInvalidated:)
+                                                     name:FlutterVoipPushTokenInvalidated
                                                    object:nil];
     }
     return self;
@@ -105,7 +110,9 @@ BOOL RunningInAppExtension(void)
 
 - (void)voipRegistration
 {
+#ifdef DEBUG
     NSLog(@"[FlutterVoipPushNotificationPlugin] voipRegistration");
+#endif
     dispatch_queue_t mainQueue = dispatch_get_main_queue();
     // Create a push registry object
     _voipRegistry = [[PKPushRegistry alloc] initWithQueue: mainQueue];
@@ -153,8 +160,9 @@ BOOL RunningInAppExtension(void)
 
 + (void)didUpdatePushCredentials:(PKPushCredentials *)credentials forType:(NSString *)type
 {
+#ifdef DEBUG
     NSLog(@"[FlutterVoipPushNotificationPlugin] didUpdatePushCredentials credentials.token = %@, type = %@", credentials.token, type);
-    
+#endif
     NSMutableString *hexString = [NSMutableString string];
     NSUInteger voipTokenLength = credentials.token.length;
     const unsigned char *bytes = credentials.token.bytes;
@@ -167,9 +175,20 @@ BOOL RunningInAppExtension(void)
    
 }
 
++ (void)didInvalidatePushTokenForType:(NSString *)type
+{
+#ifdef DEBUG
+    NSLog(@"[FlutterVoipPushNotificationPlugin] didInvalidatePushTokenFor type = %@", type);
+#endif
+    [[NSNotificationCenter defaultCenter] postNotificationName:FlutterVoipPushTokenInvalidated
+                                                        object:self];
+}
+
 + (void)didReceiveIncomingPushWithPayload:(PKPushPayload *)payload forType:(NSString *)type
 {
+#ifdef DEBUG
     NSLog(@"[FlutterVoipPushNotificationPlugin] didReceiveIncomingPushWithPayload payload.dictionaryPayload = %@, type = %@", payload.dictionaryPayload, type);
+#endif
     [[NSNotificationCenter defaultCenter] postNotificationName:FlutterVoipRemoteNotificationReceived
                                                         object:self
                                                       userInfo:payload.dictionaryPayload];
@@ -177,7 +196,9 @@ BOOL RunningInAppExtension(void)
 
 - (void)handleRemoteNotificationsRegistered:(NSNotification *)notification
 {
+#ifdef DEBUG
     NSLog(@"[FlutterVoipPushNotificationPlugin] handleRemoteNotificationsRegistered notification.userInfo = %@", notification.userInfo);
+#endif
     [_channel invokeMethod:@"onToken" arguments:notification.userInfo];
 }
 
@@ -203,6 +224,14 @@ BOOL RunningInAppExtension(void)
     } else {
         [_channel invokeMethod:@"onMessage" arguments:@{@"local": @NO, @"notification": notification.userInfo}];
     }
+}
+
+- (void)handlePushTokenInvalidated:(NSNotification *)notification
+{
+#ifdef DEBUG
+    NSLog(@"[FlutterVoipPushNotificationPlugin] handlePushTokenInvalidated notification.userInfo = %@", notification.userInfo);
+#endif
+    [_channel invokeMethod:@"onTokenInvalidated" arguments:@{@"deviceToken": [self getToken]}];
 }
 
 @end

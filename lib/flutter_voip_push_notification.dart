@@ -12,6 +12,12 @@ import 'package:flutter/widgets.dart';
 typedef Future<dynamic> MessageHandler(
     bool isLocal, Map<String, dynamic> notification);
 
+/// Handler for invalid PushKit tokens
+///
+/// [invalidToken] is the token that has been invalidated and should be removed from your server
+/// https://stackoverflow.com/questions/46977380/voip-push-under-what-circumstances-does-didinvalidatepushtokenfortype-get-calle#47015401
+typedef Future<dynamic> InvalidTokenHandler(String invalidToken);
+
 class NotificationSettings {
   const NotificationSettings({
     this.sound = true,
@@ -92,7 +98,7 @@ class FlutterVoipPushNotification {
   String _token;
   MessageHandler _onMessage;
   MessageHandler _onResume;
-
+  InvalidTokenHandler _onInvalidToken;
 
   final StreamController<String> _tokenStreamController =
       StreamController<String>.broadcast();
@@ -106,9 +112,11 @@ class FlutterVoipPushNotification {
   void configure({
     MessageHandler onMessage,
     MessageHandler onResume,
+    InvalidTokenHandler onInvalidToken,
   }) {
     _onMessage = onMessage;
     _onResume = onResume;
+    _onInvalidToken = onInvalidToken;
     _channel.setMethodCallHandler(_handleMethod);
     //_channel.invokeMethod<void>('configure');
   }
@@ -120,12 +128,19 @@ class FlutterVoipPushNotification {
         _token = map["deviceToken"];
         _tokenStreamController.add(_token);
         return null;
+      case "onTokenInvalidated":
+        final String invalidToken = map["deviceToken"];
+        return _onInvalidToken?.call(invalidToken);
       case "onMessage":
-        return _onMessage(
-            map["local"], map["notification"].cast<String, dynamic>());
+        final bool isLocal = map["local"];
+        final Map<String, dynamic> notification =
+            map["notification"].cast<String, dynamic>();
+        return _onMessage?.call(isLocal, notification);
       case "onResume":
-        return _onResume(
-            map["local"], map["notification"].cast<String, dynamic>());
+        final bool isLocal = map["local"];
+        final Map<String, dynamic> notification =
+            map["notification"].cast<String, dynamic>();
+        return _onResume?.call(isLocal, notification);
       default:
         throw UnsupportedError("Unrecognized JSON message");
     }
@@ -138,16 +153,20 @@ class FlutterVoipPushNotification {
 
   /// Prompts the user for notification permissions the first time
   /// it is called.
-  Future<void> requestNotificationPermissions(
-      [NotificationSettings iosSettings =
-          const NotificationSettings()]) async {
+  Future<void> requestNotificationPermissions([
+    NotificationSettings iosSettings = const NotificationSettings(),
+  ]) async {
     _channel.invokeMethod<void>(
-        'requestNotificationPermissions', iosSettings.toMap());
+      'requestNotificationPermissions',
+      iosSettings.toMap(),
+    );
   }
 
   /// Schedules the local [notification] for immediate presentation.
   Future<void> presentLocalNotification(LocalNotification notification) async {
     await _channel.invokeMethod<void>(
-        'presentLocalNotification', notification.toMap());
+      'presentLocalNotification',
+      notification.toMap(),
+    );
   }
 }
