@@ -1,11 +1,17 @@
+# Flutter Voip Push Notification
 
+## 0.0.4
+
+- Add support for invalidating tokens
 
 ## 0.0.3
-* Rename IOSNotificationSettings to NotificationSettings and refactored example
+
+- Rename IOSNotificationSettings to NotificationSettings and refactored example
 
 ## 0.0.2
-* Add support for showing local notification, uses app delegate as push delegate
+
+- Add support for showing local notification, uses app delegate as push delegate
 
 ## 0.0.1
 
-* Initial release.
+- Initial release.
