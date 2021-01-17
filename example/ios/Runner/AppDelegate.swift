@@ -27,6 +27,11 @@ import flutter_voip_push_notification
         FlutterVoipPushNotificationPlugin.didReceiveIncomingPush(with: payload, forType: type.rawValue)
     }
     
+    // Handle invalidated push tokens
+    func pushRegistry(_ registry: PKPushRegistry, didInvalidatePushTokenFor type: PKPushType) {
+        FlutterVoipPushNotificationPlugin.didInvalidatePushToken(forType: type.rawValue)
+    }
+    
     // Handle incoming pushes
     func pushRegistry(_ registry: PKPushRegistry, didUpdate pushCredentials: PKPushCredentials, for type: PKPushType) {
         // Process the received push

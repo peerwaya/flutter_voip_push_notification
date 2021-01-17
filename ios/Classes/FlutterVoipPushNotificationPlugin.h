@@ -4,4 +4,5 @@
 @interface FlutterVoipPushNotificationPlugin : NSObject<FlutterPlugin>
 + (void)didUpdatePushCredentials:(PKPushCredentials *)credentials forType:(NSString *)type;
 + (void)didReceiveIncomingPushWithPayload:(PKPushPayload *)payload forType:(NSString *)type;
++ (void)didInvalidatePushTokenForType:(NSString *)type;
 @end
